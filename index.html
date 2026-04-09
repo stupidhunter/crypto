@@ -874,16 +874,21 @@
 </footer>
 
 <script>
-const coins = [
-  { rank:1, name:'Bitcoin', sym:'BTC', icon:'₿', price:95420, change:3.52, mcap:'1.87T', dir:'up', color:'#f7931a' },
-  { rank:2, name:'Ethereum', sym:'ETH', icon:'Ξ', price:3280, change:2.18, mcap:'394B', dir:'up', color:'#627eea' },
-  { rank:3, name:'Solana', sym:'SOL', icon:'◎', price:184.5, change:-1.24, mcap:'86.2B', dir:'dn', color:'#9945ff' },
-  { rank:4, name:'BNB', sym:'BNB', icon:'B', price:612, change:0.87, mcap:'88.1B', dir:'up', color:'#f0b90b' },
-  { rank:5, name:'XRP', sym:'XRP', icon:'✕', price:2.34, change:-2.65, mcap:'134B', dir:'dn', color:'#00aae4' },
-  { rank:6, name:'Cardano', sym:'ADA', icon:'₳', price:0.92, change:5.14, mcap:'32.4B', dir:'up', color:'#0033ad' },
-  { rank:7, name:'Avalanche', sym:'AVAX', icon:'▲', price:38.7, change:1.93, mcap:'16B', dir:'up', color:'#e84142' },
-  { rank:8, name:'Dogecoin', sym:'DOGE', icon:'Ð', price:0.187, change:-0.76, mcap:'27.3B', dir:'dn', color:'#c2a633' },
-];
+// Coin metadata (icon, color) — giá thật lấy từ CoinGecko
+const COIN_META = {
+  bitcoin:    { icon:'₿', color:'#f7931a' },
+  ethereum:   { icon:'Ξ', color:'#627eea' },
+  solana:     { icon:'◎', color:'#9945ff' },
+  binancecoin:{ icon:'B', color:'#f0b90b' },
+  ripple:     { icon:'✕', color:'#00aae4' },
+  cardano:    { icon:'₳', color:'#0033ad' },
+  avalanche:  { icon:'▲', color:'#e84142' },
+  dogecoin:   { icon:'Ð', color:'#c2a633' },
+};
+const COIN_IDS = Object.keys(COIN_META).join(',');
+const CGURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COIN_IDS}&order=market_cap_desc&per_page=8&sparkline=false&price_change_percentage=24h`;
+
+let liveCoins = [];
 
 function sparklineHTML(dir) {
   const heights = Array.from({length:10}, () => Math.floor(Math.random()*18)+8);
@@ -891,57 +896,75 @@ function sparklineHTML(dir) {
   return '<div class="sparkline">' + heights.map(h=>`<span style="height:${h}px;background:${color};opacity:.7;"></span>`).join('') + '</div>';
 }
 
-function fmt(n) {
+function fmtMcap(n) {
   if(n>=1e12) return '$'+(n/1e12).toFixed(2)+'T';
-  if(n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
-  if(n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
-  return '$'+n.toFixed(2);
+  if(n>=1e9)  return '$'+(n/1e9).toFixed(1)+'B';
+  if(n>=1e6)  return '$'+(n/1e6).toFixed(1)+'M';
+  return '$'+n.toLocaleString();
 }
 
 function fmtPrice(p) {
   if(p>=1000) return '$'+p.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
-  if(p>=1) return '$'+p.toFixed(3);
-  return '$'+p.toFixed(4);
+  if(p>=1)    return '$'+p.toFixed(3);
+  return '$'+p.toFixed(5);
 }
 
 function renderTable() {
+  if(!liveCoins.length) return;
   const tbody = document.getElementById('market-body');
-  tbody.innerHTML = coins.map(c => {
-    const chg = c.change + (Math.random()-.5)*.3;
-    const pr = c.price * (1 + (Math.random()-.5)*.002);
-    const chgC = chg>0?'up':'dn';
-    const sign = chg>0?'+':'';
+  tbody.innerHTML = liveCoins.map((c,i) => {
+    const meta = COIN_META[c.id] || { icon:'●', color:'#888' };
+    const chg = c.price_change_percentage_24h || 0;
+    const dir = chg >= 0 ? 'up' : 'dn';
+    const sign = chg >= 0 ? '+' : '';
     return `<tr>
-      <td style="color:var(--muted);font-size:.8rem;">${c.rank}</td>
+      <td style="color:var(--muted);font-size:.8rem;">${i+1}</td>
       <td><div class="coin-cell">
-        <div class="coin-icon" style="background:rgba(255,255,255,0.06);color:${c.color};font-size:1rem;">${c.icon}</div>
-        <div><div class="coin-name">${c.name}</div><div class="coin-sym">${c.sym}</div></div>
+        <div class="coin-icon" style="background:rgba(255,255,255,0.06);color:${meta.color};font-size:1rem;">${meta.icon}</div>
+        <div><div class="coin-name">${c.name}</div><div class="coin-sym">${c.symbol?.toUpperCase()}</div></div>
       </div></td>
-      <td class="price-val">${fmtPrice(pr)}</td>
-      <td class="${chgC}" style="font-weight:600;">${sign}${chg.toFixed(2)}%</td>
-      <td style="color:var(--muted);">${c.mcap}</td>
-      <td>${sparklineHTML(c.dir)}</td>
-      <td><button class="buy-btn ${chg>0?'b':'s'}">${chg>0?'Mua':'Bán'}</button></td>
+      <td class="price-val">${fmtPrice(c.current_price)}</td>
+      <td class="${dir}" style="font-weight:600;">${sign}${chg.toFixed(2)}%</td>
+      <td style="color:var(--muted);">${fmtMcap(c.market_cap)}</td>
+      <td>${sparklineHTML(dir)}</td>
+      <td><button class="buy-btn ${chg>=0?'b':'s'}">${chg>=0?'Mua':'Bán'}</button></td>
     </tr>`;
   }).join('');
-  const now = new Date();
-  document.getElementById('update-time').textContent = now.toLocaleTimeString('vi-VN');
+  document.getElementById('update-time').textContent = new Date().toLocaleTimeString('vi-VN');
 }
 
-function refreshPrices() { renderTable(); }
-renderTable();
-setInterval(renderTable, 5000);
+function renderTicker() {
+  if(!liveCoins.length) return;
+  const track = document.getElementById('ticker');
+  const double = [...liveCoins, ...liveCoins];
+  track.innerHTML = double.map(c => {
+    const chg = c.price_change_percentage_24h || 0;
+    return `<div class="ticker-item">
+      <span class="ticker-name">${c.symbol?.toUpperCase()}</span>
+      <span class="ticker-price">${fmtPrice(c.current_price)}</span>
+      <span class="${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</span>
+    </div>`;
+  }).join('');
+}
 
-// TICKER
-const tickerCoins = [...coins, ...coins];
-const track = document.getElementById('ticker');
-track.innerHTML = tickerCoins.map(c =>
-  `<div class="ticker-item">
-    <span class="ticker-name">${c.sym}</span>
-    <span class="ticker-price">${fmtPrice(c.price)}</span>
-    <span class="${c.change>0?'up':'dn'}">${c.change>0?'▲':'▼'} ${Math.abs(c.change).toFixed(2)}%</span>
-  </div>`
-).join('');
+async function fetchPrices() {
+  try {
+    const res = await fetch(CGURL);
+    if(!res.ok) throw new Error('API lỗi');
+    liveCoins = await res.json();
+    renderTable();
+    renderTicker();
+  } catch(e) {
+    console.warn('CoinGecko fetch lỗi:', e.message);
+    // Giữ nguyên data cũ nếu có lỗi
+  }
+}
+
+function refreshPrices() { fetchPrices(); }
+
+// Gọi ngay khi load, sau đó mỗi 60s (CoinGecko free tier giới hạn rate)
+fetchPrices();
+setInterval(fetchPrices, 60000);
 
 // FAQ TOGGLE
 function toggleFaq(el) {
@@ -984,8 +1007,8 @@ document.querySelectorAll('.feat-card, .stat-card').forEach(el => {
 // =====================================================
 // SUPABASE CONFIG — chỉ cần thay 2 dòng dưới đây
 // =====================================================
-const SUPA_URL = 'https://zrlduuchvzatkbebhlsx.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybGR1dWNodnphdGtiZWJobHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjA5NzcsImV4cCI6MjA5MTMzNjk3N30.xUQWrL4r9pkScwyg1QdWZf0abkOJaIK2LzNC7OPpcL8';
+const SUPA_URL = 'https://YOUR_PROJECT.supabase.co';
+const SUPA_KEY = 'YOUR_ANON_KEY';
 // =====================================================
 
 async function fetchNews() {
