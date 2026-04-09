@@ -2,9 +2,8 @@ name: 🤖 Daily News Bot
 
 on:
   schedule:
-    # 7:00 AM Vietnam time (UTC+7) = 00:00 UTC
     - cron: "0 0 * * *"
-  workflow_dispatch:   # Cho phép chạy thủ công
+  workflow_dispatch:
 
 jobs:
   scrape:
@@ -23,13 +22,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('bot/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
 
       - name: Install dependencies
-        run: pip install -r bot/requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Run scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python bot/scraper.py
+        run: python scraper.py
