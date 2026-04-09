@@ -744,52 +744,8 @@
   <div class="section-tag">TIN TỨC</div>
   <h2 class="section-title">Bản Tin <span>Crypto</span> Hôm Nay</h2>
   <p class="section-desc">Cập nhật liên tục từ thị trường toàn cầu và Việt Nam.</p>
-  <div class="news-grid">
-    <div class="news-card">
-      <div class="news-img" style="background:linear-gradient(135deg,#0b1a12,#0d2b1a);">
-        <span style="font-size:3rem;">₿</span>
-        <div class="news-img-text" style="color:rgba(0,232,122,0.7);">BITCOIN · ANALYSIS</div>
-      </div>
-      <div class="news-body">
-        <span class="news-tag" style="color:var(--green);">PHÂN TÍCH</span>
-        <h4>BTC vượt $95K — Liệu bull run 2025 đã chính thức bắt đầu?</h4>
-        <p>Bitcoin đã phá vỡ vùng kháng cự $92K sau 3 tuần tích lũy, on-chain data cho thấy dấu hiệu tích cực...</p>
-        <div class="news-meta">
-          <span>👤 TranAnh_Trader</span>
-          <span>2 giờ trước</span>
-        </div>
-      </div>
-    </div>
-    <div class="news-card">
-      <div class="news-img" style="background:linear-gradient(135deg,#0a0e1f,#111a35);">
-        <span style="font-size:3rem;">Ξ</span>
-        <div class="news-img-text" style="color:rgba(0,200,255,0.7);">ETHEREUM · DeFi</div>
-      </div>
-      <div class="news-body">
-        <span class="news-tag" style="color:var(--cyan);">DEFI</span>
-        <h4>Ethereum Layer 2 đạt TVL kỷ lục $85B — Arbitrum dẫn đầu</h4>
-        <p>Hệ sinh thái L2 của Ethereum tiếp tục bùng nổ khi phí gas mainnet vẫn còn cao, người dùng chuyển sang...</p>
-        <div class="news-meta">
-          <span>👤 DeFi_Minh</span>
-          <span>5 giờ trước</span>
-        </div>
-      </div>
-    </div>
-    <div class="news-card">
-      <div class="news-img" style="background:linear-gradient(135deg,#1a0e1f,#2d1545);">
-        <span style="font-size:3rem;">◎</span>
-        <div class="news-img-text" style="color:rgba(168,85,247,0.7);">SOLANA · NFT</div>
-      </div>
-      <div class="news-body">
-        <span class="news-tag" style="color:#a855f7;">NFT</span>
-        <h4>Solana NFT volume vượt Ethereum lần đầu tiên trong lịch sử</h4>
-        <p>Sự bùng nổ của các collection trên Solana đã đẩy volume giao dịch NFT vượt qua Ethereum trong 7 ngày...</p>
-        <div class="news-meta">
-          <span>👤 NFT_Hunter_VN</span>
-          <span>8 giờ trước</span>
-        </div>
-      </div>
-    </div>
+  <div class="news-grid" id="news-grid">
+    <div style="color:var(--muted);padding:2rem;grid-column:1/-1;text-align:center;">Đang tải tin tức...</div>
   </div>
   <div style="text-align:center;margin-top:2rem;">
     <a href="#" class="btn-outline" style="font-size:.9rem;padding:.6rem 1.8rem;">Xem Tất Cả Tin Tức →</a>
@@ -1019,9 +975,80 @@ setInterval(() => {
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) { e.target.style.animation = 'fadeInUp .6s ease forwards'; e.target.style.opacity='1'; } });
 }, { threshold:.1 });
-document.querySelectorAll('.feat-card, .stat-card, .news-card').forEach(el => {
+document.querySelectorAll('.feat-card, .stat-card').forEach(el => {
   el.style.opacity='0'; obs.observe(el);
 });
+</script>
+
+<script>
+// =====================================================
+// SUPABASE CONFIG — chỉ cần thay 2 dòng dưới đây
+// =====================================================
+const SUPA_URL = 'https://zrlduuchvzatkbebhlsx.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybGR1dWNodnphdGtiZWJobHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjA5NzcsImV4cCI6MjA5MTMzNjk3N30.xUQWrL4r9pkScwyg1QdWZf0abkOJaIK2LzNC7OPpcL8';
+// =====================================================
+
+async function fetchNews() {
+  const container = document.getElementById('news-grid');
+  try {
+    const res = await fetch(
+      `${SUPA_URL}/rest/v1/articles?select=*&order=published_at.desc&limit=6`,
+      { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
+    );
+    const articles = await res.json();
+    if (!Array.isArray(articles) || !articles.length) {
+      container.innerHTML = '<div style="color:var(--muted);padding:2rem;grid-column:1/-1;text-align:center;">Chưa có bài viết. Bot sẽ chạy lúc 7:00 AM sáng mai.</div>';
+      return;
+    }
+    container.innerHTML = articles.map(a => `
+      <div class="news-card" onclick="window.open('${escHtml(a.source_url)}','_blank')" style="cursor:pointer;">
+        <div class="news-img" style="background:${catColor(a.category)};">
+          <span style="font-size:2.5rem;">${catEmoji(a.category)}</span>
+          <div class="news-img-text" style="color:rgba(255,255,255,0.6);">${escHtml(a.source_name||'')} · ${escHtml(a.category||'')}</div>
+        </div>
+        <div class="news-body">
+          <span class="news-tag" style="color:${catAccent(a.category)};">${escHtml(a.category||'Tin tức')}</span>
+          <h4>${escHtml(a.title||'')}</h4>
+          <p>${escHtml((a.summary||'').substring(0,140))}${(a.summary||'').length>140?'...':''}</p>
+          <div class="news-meta">
+            <span>${escHtml(a.source_name||'Nguồn ẩn')}</span>
+            <span>${timeAgo(a.published_at)}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    container.querySelectorAll('.news-card').forEach((el,i) => {
+      el.style.opacity='0';
+      el.style.animation=`fadeInUp .5s ease ${i*0.1}s forwards`;
+    });
+  } catch(err) {
+    container.innerHTML = `<div style="color:var(--red);padding:2rem;grid-column:1/-1;text-align:center;">Lỗi tải tin: ${err.message}</div>`;
+  }
+}
+
+function catColor(cat) {
+  const m = {'Bitcoin':'linear-gradient(135deg,#0b1a12,#0d2b1a)','DeFi':'linear-gradient(135deg,#0a0e1f,#111a35)','Altcoin':'linear-gradient(135deg,#1a0e1f,#2d1545)','Việt Nam':'linear-gradient(135deg,#1a1200,#2d2000)','Tin tức':'linear-gradient(135deg,#0a0f1a,#0d1830)'};
+  return m[cat]||m['Tin tức'];
+}
+function catEmoji(cat) {
+  return {'Bitcoin':'₿','DeFi':'⬡','Altcoin':'◎','Việt Nam':'🇻🇳','Tin tức':'📰'}[cat]||'🌐';
+}
+function catAccent(cat) {
+  return {'Bitcoin':'var(--green)','DeFi':'var(--cyan)','Altcoin':'#a855f7','Việt Nam':'var(--gold)','Tin tức':'var(--muted)'}[cat]||'var(--muted)';
+}
+function timeAgo(iso) {
+  if(!iso) return '';
+  const d=(Date.now()-new Date(iso).getTime())/1000;
+  if(d<3600) return `${Math.floor(d/60)} phút trước`;
+  if(d<86400) return `${Math.floor(d/3600)} giờ trước`;
+  return `${Math.floor(d/86400)} ngày trước`;
+}
+function escHtml(s=''){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+fetchNews();
+setInterval(fetchNews, 5*60*1000);
 </script>
 </body>
 </html>
