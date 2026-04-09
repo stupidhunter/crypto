@@ -18,15 +18,14 @@ HEADERS = {
 
 # ── Nguồn RSS crypto (thêm/bớt tùy ý) ──────────────────────────────────────
 FEEDS = [
-    {"url": "https://cointelegraph.com/rss",           "name": "CoinTelegraph", "cat": "Tin tức"},
-    {"url": "https://coindesk.com/arc/outboundfeeds/rss/", "name": "CoinDesk", "cat": "Tin tức"},
-    {"url": "https://decrypt.co/feed",                 "name": "Decrypt",      "cat": "Tin tức"},
-    {"url": "https://bitcoinmagazine.com/.rss/full/",  "name": "Bitcoin Mag",  "cat": "Bitcoin"},
-    {"url": "https://thedefiant.io/feed",              "name": "The Defiant",  "cat": "DeFi"},
-    {"url": "https://www.cryptopolitan.com/feed/",     "name": "Cryptopolitan","cat": "Altcoin"},
-    # Nguồn Việt Nam
-    {"url": "https://tienao.com/feed/",                "name": "TiềnÁo.com",   "cat": "Việt Nam"},
-    {"url": "https://coinviet.net/feed",               "name": "CoinViet",     "cat": "Việt Nam"},
+    {"url": "https://feeds.feedburner.com/CoinDesk",           "name": "CoinDesk",      "cat": "Tin tức"},
+    {"url": "https://cointelegraph.com/rss/tag/bitcoin",       "name": "CoinTelegraph", "cat": "Bitcoin"},
+    {"url": "https://cointelegraph.com/rss/tag/ethereum",      "name": "CoinTelegraph", "cat": "DeFi"},
+    {"url": "https://cointelegraph.com/rss/tag/altcoin",       "name": "CoinTelegraph", "cat": "Altcoin"},
+    {"url": "https://decrypt.co/feed",                         "name": "Decrypt",       "cat": "Tin tức"},
+    {"url": "https://cryptoslate.com/feed/",                   "name": "CryptoSlate",   "cat": "Tin tức"},
+    {"url": "https://cryptopotato.com/feed/",                  "name": "CryptoPotato",  "cat": "Altcoin"},
+    {"url": "https://ambcrypto.com/feed/",                     "name": "AMBCrypto",     "cat": "Tin tức"},
 ]
 
 MAX_PER_FEED = 5  # Số bài tối đa mỗi nguồn mỗi lần chạy
