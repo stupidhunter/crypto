@@ -874,58 +874,54 @@
 </footer>
 
 <script>
-// Coin metadata (icon, color) — giá thật lấy từ CoinGecko
+// Coin metadata
 const COIN_META = {
-  bitcoin:    { icon:'₿', color:'#f7931a' },
-  ethereum:   { icon:'Ξ', color:'#627eea' },
-  solana:     { icon:'◎', color:'#9945ff' },
-  binancecoin:{ icon:'B', color:'#f0b90b' },
-  ripple:     { icon:'✕', color:'#00aae4' },
-  cardano:    { icon:'₳', color:'#0033ad' },
-  avalanche:  { icon:'▲', color:'#e84142' },
-  dogecoin:   { icon:'Ð', color:'#c2a633' },
+  BTC:  { name:'Bitcoin',   icon:'₿', color:'#f7931a', mcap:'1.87T' },
+  ETH:  { name:'Ethereum',  icon:'Ξ', color:'#627eea', mcap:'394B'  },
+  SOL:  { name:'Solana',    icon:'◎', color:'#9945ff', mcap:'86.2B' },
+  BNB:  { name:'BNB',       icon:'B', color:'#f0b90b', mcap:'88.1B' },
+  XRP:  { name:'XRP',       icon:'✕', color:'#00aae4', mcap:'134B'  },
+  ADA:  { name:'Cardano',   icon:'₳', color:'#0033ad', mcap:'32.4B' },
+  AVAX: { name:'Avalanche', icon:'▲', color:'#e84142', mcap:'16B'   },
+  DOGE: { name:'Dogecoin',  icon:'Ð', color:'#c2a633', mcap:'27.3B' },
 };
-const COIN_IDS = Object.keys(COIN_META).join(',');
-const CGURL = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COIN_IDS}&order=market_cap_desc&per_page=8&sparkline=false&price_change_percentage=24h`;
 
-let liveCoins = [];
-
-function sparklineHTML(dir) {
-  const heights = Array.from({length:10}, () => Math.floor(Math.random()*18)+8);
-  const color = dir==='up' ? 'var(--green)' : 'var(--red)';
-  return '<div class="sparkline">' + heights.map(h=>`<span style="height:${h}px;background:${color};opacity:.7;"></span>`).join('') + '</div>';
-}
-
-function fmtMcap(n) {
-  if(n>=1e12) return '$'+(n/1e12).toFixed(2)+'T';
-  if(n>=1e9)  return '$'+(n/1e9).toFixed(1)+'B';
-  if(n>=1e6)  return '$'+(n/1e6).toFixed(1)+'M';
-  return '$'+n.toLocaleString();
-}
+// Lưu giá + change hiện tại
+const prices = {};
+const changes = {};
+Object.keys(COIN_META).forEach(sym => {
+  prices[sym]  = 0;
+  changes[sym] = 0;
+});
 
 function fmtPrice(p) {
+  if(p<=0)    return '—';
   if(p>=1000) return '$'+p.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
   if(p>=1)    return '$'+p.toFixed(3);
   return '$'+p.toFixed(5);
 }
 
+function sparklineHTML(dir) {
+  const heights = Array.from({length:10}, () => Math.floor(Math.random()*18)+8);
+  const color = dir==='up' ? 'var(--green)' : 'var(--red)';
+  return '<div class="sparkline">'+heights.map(h=>`<span style="height:${h}px;background:${color};opacity:.7;"></span>`).join('')+'</div>';
+}
+
 function renderTable() {
-  if(!liveCoins.length) return;
   const tbody = document.getElementById('market-body');
-  tbody.innerHTML = liveCoins.map((c,i) => {
-    const meta = COIN_META[c.id] || { icon:'●', color:'#888' };
-    const chg = c.price_change_percentage_24h || 0;
+  tbody.innerHTML = Object.entries(COIN_META).map(([sym, m], i) => {
+    const p   = prices[sym];
+    const chg = changes[sym];
     const dir = chg >= 0 ? 'up' : 'dn';
-    const sign = chg >= 0 ? '+' : '';
     return `<tr>
       <td style="color:var(--muted);font-size:.8rem;">${i+1}</td>
       <td><div class="coin-cell">
-        <div class="coin-icon" style="background:rgba(255,255,255,0.06);color:${meta.color};font-size:1rem;">${meta.icon}</div>
-        <div><div class="coin-name">${c.name}</div><div class="coin-sym">${c.symbol?.toUpperCase()}</div></div>
+        <div class="coin-icon" style="background:rgba(255,255,255,0.06);color:${m.color};font-size:1rem;">${m.icon}</div>
+        <div><div class="coin-name">${m.name}</div><div class="coin-sym">${sym}</div></div>
       </div></td>
-      <td class="price-val">${fmtPrice(c.current_price)}</td>
-      <td class="${dir}" style="font-weight:600;">${sign}${chg.toFixed(2)}%</td>
-      <td style="color:var(--muted);">${fmtMcap(c.market_cap)}</td>
+      <td class="price-val">${fmtPrice(p)}</td>
+      <td class="${dir}" style="font-weight:600;">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+      <td style="color:var(--muted);">${m.mcap}</td>
       <td>${sparklineHTML(dir)}</td>
       <td><button class="buy-btn ${chg>=0?'b':'s'}">${chg>=0?'Mua':'Bán'}</button></td>
     </tr>`;
@@ -934,37 +930,63 @@ function renderTable() {
 }
 
 function renderTicker() {
-  if(!liveCoins.length) return;
   const track = document.getElementById('ticker');
-  const double = [...liveCoins, ...liveCoins];
-  track.innerHTML = double.map(c => {
-    const chg = c.price_change_percentage_24h || 0;
+  const items = Object.entries(COIN_META);
+  const double = [...items, ...items];
+  track.innerHTML = double.map(([sym, m]) => {
+    const p   = prices[sym];
+    const chg = changes[sym];
     return `<div class="ticker-item">
-      <span class="ticker-name">${c.symbol?.toUpperCase()}</span>
-      <span class="ticker-price">${fmtPrice(c.current_price)}</span>
+      <span class="ticker-name">${sym}</span>
+      <span class="ticker-price">${fmtPrice(p)}</span>
       <span class="${chg>=0?'up':'dn'}">${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(2)}%</span>
     </div>`;
   }).join('');
 }
 
-async function fetchPrices() {
-  try {
-    const res = await fetch(CGURL);
-    if(!res.ok) throw new Error('API lỗi');
-    liveCoins = await res.json();
+// ── Binance WebSocket (real-time, không giới hạn) ──────────────────
+const SYMS = Object.keys(COIN_META).map(s => s.toLowerCase()+'usdt@ticker').join('/');
+let ws, wsRetry = 0;
+
+function connectWS() {
+  ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${SYMS}`);
+
+  ws.onopen = () => {
+    wsRetry = 0;
+    console.log('Binance WS connected');
+  };
+
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    const d   = msg.data;
+    if(!d) return;
+    const sym = d.s?.replace('USDT','');
+    if(!sym || !COIN_META[sym]) return;
+    prices[sym]  = parseFloat(d.c) || 0;   // current price
+    changes[sym] = parseFloat(d.P) || 0;   // % change 24h
     renderTable();
     renderTicker();
-  } catch(e) {
-    console.warn('CoinGecko fetch lỗi:', e.message);
-    // Giữ nguyên data cũ nếu có lỗi
-  }
+  };
+
+  ws.onerror = () => ws.close();
+
+  ws.onclose = () => {
+    // Reconnect với exponential backoff
+    const delay = Math.min(1000 * 2**wsRetry, 30000);
+    wsRetry++;
+    console.warn(`WS closed, reconnect in ${delay}ms`);
+    setTimeout(connectWS, delay);
+  };
 }
 
-function refreshPrices() { fetchPrices(); }
+function refreshPrices() {
+  // Reconnect WS nếu đang đóng
+  if(!ws || ws.readyState === WebSocket.CLOSED) connectWS();
+}
 
-// Gọi ngay khi load, sau đó mỗi 60s (CoinGecko free tier giới hạn rate)
-fetchPrices();
-setInterval(fetchPrices, 60000);
+// Khởi động
+renderTable(); // render placeholder trước
+connectWS();   // kết nối WS lấy giá thật
 
 // FAQ TOGGLE
 function toggleFaq(el) {
