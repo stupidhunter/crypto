@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "congdongcrypto.html", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/congdongcrypto.html" }
+  ]
+}
