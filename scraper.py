@@ -2,9 +2,8 @@
 CongDongCrypto News Bot
 Chạy hằng ngày qua GitHub Actions — scrape RSS feeds và đẩy lên Supabase
 """
-import os, feedparser, requests, hashlib
+import os, feedparser, requests
 from datetime import datetime, timezone
-from newspaper import Article
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
@@ -13,10 +12,8 @@ HEADERS = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
-    "Prefer": "return=minimal",
 }
 
-# ── Nguồn RSS crypto (thêm/bớt tùy ý) ──────────────────────────────────────
 FEEDS = [
     {"url": "https://feeds.feedburner.com/CoinDesk",           "name": "CoinDesk",      "cat": "Tin tức"},
     {"url": "https://cointelegraph.com/rss/tag/bitcoin",       "name": "CoinTelegraph", "cat": "Bitcoin"},
@@ -26,37 +23,27 @@ FEEDS = [
     {"url": "https://cryptoslate.com/feed/",                   "name": "CryptoSlate",   "cat": "Tin tức"},
     {"url": "https://cryptopotato.com/feed/",                  "name": "CryptoPotato",  "cat": "Altcoin"},
     {"url": "https://ambcrypto.com/feed/",                     "name": "AMBCrypto",     "cat": "Tin tức"},
+    {"url": "https://bitcoinist.com/feed/",                    "name": "Bitcoinist",    "cat": "Bitcoin"},
+    {"url": "https://newsbtc.com/feed/",                       "name": "NewsBTC",       "cat": "Tin tức"},
 ]
 
-MAX_PER_FEED = 5  # Số bài tối đa mỗi nguồn mỗi lần chạy
+MAX_PER_FEED = 5
+
+# User-agent để tránh bị block
+feedparser.USER_AGENT = "Mozilla/5.0 (compatible; CongDongCryptoBot/1.0)"
 
 def get_existing_urls() -> set:
-    """Lấy danh sách URL đã có trong DB để tránh trùng"""
     res = requests.get(
         f"{SUPABASE_URL}/rest/v1/articles",
         headers=HEADERS,
-        params={"select": "source_url", "limit": 1000}
+        params={"select": "source_url", "limit": 2000}
     )
     if res.ok:
         return {row["source_url"] for row in res.json()}
+    print(f"  ✗ Lấy existing URLs lỗi: {res.status_code} {res.text[:100]}")
     return set()
 
-def extract_full_article(url: str) -> dict:
-    """Dùng newspaper3k để lấy full text và ảnh"""
-    try:
-        art = Article(url, language="en")
-        art.download()
-        art.parse()
-        return {
-            "content": art.text[:5000] if art.text else None,
-            "image_url": art.top_image or None,
-            "author": ", ".join(art.authors) if art.authors else None,
-        }
-    except Exception:
-        return {"content": None, "image_url": None, "author": None}
-
 def parse_date(entry) -> str:
-    """Parse published date từ RSS entry"""
     for field in ("published_parsed", "updated_parsed"):
         ts = getattr(entry, field, None)
         if ts:
@@ -68,7 +55,6 @@ def parse_date(entry) -> str:
     return datetime.now(timezone.utc).isoformat()
 
 def insert_article(article: dict) -> bool:
-    """Insert 1 bài vào Supabase, trả về True nếu thành công"""
     res = requests.post(
         f"{SUPABASE_URL}/rest/v1/articles",
         headers={**HEADERS, "Prefer": "resolution=ignore-duplicates,return=minimal"},
@@ -77,10 +63,17 @@ def insert_article(article: dict) -> bool:
     return res.status_code in (200, 201)
 
 def scrape_feed(feed: dict, existing: set) -> int:
-    """Scrape 1 RSS feed, trả về số bài đã insert"""
     print(f"\n→ {feed['name']} ({feed['url']})")
     try:
         parsed = feedparser.parse(feed["url"])
+        status = parsed.get("status", "N/A")
+        entries = len(parsed.entries)
+        print(f"  HTTP status: {status} | Entries: {entries}")
+        if parsed.bozo:
+            print(f"  Bozo warning: {parsed.bozo_exception}")
+        if entries == 0:
+            print("  ⚠ Không có entry — feed trống hoặc bị block")
+            return 0
     except Exception as e:
         print(f"  ✗ Parse lỗi: {e}")
         return 0
@@ -92,40 +85,40 @@ def scrape_feed(feed: dict, existing: set) -> int:
             continue
 
         title = entry.get("title", "").strip()
-        summary = entry.get("summary", "").strip()[:500]
         if not title:
             continue
 
-        # Lấy full content nếu summary quá ngắn
-        extra = {}
-        if len(summary) < 100:
-            extra = extract_full_article(url)
-        else:
-            extra = {"content": None, "image_url": None, "author": None}
+        summary = entry.get("summary", "").strip()[:500]
 
-        # Thử lấy ảnh từ media:content trong RSS
-        image_url = extra.get("image_url")
+        # Lấy ảnh từ media:content hoặc enclosures
+        image_url = None
+        media = entry.get("media_content", [])
+        if media:
+            image_url = media[0].get("url")
         if not image_url:
-            media = entry.get("media_content", [])
-            if media:
-                image_url = media[0].get("url")
+            for enc in entry.get("enclosures", []):
+                if enc.get("type", "").startswith("image"):
+                    image_url = enc.get("href") or enc.get("url")
+                    break
 
         article = {
             "title":        title,
-            "summary":      summary or extra.get("content", "")[:400],
-            "content":      extra.get("content"),
+            "summary":      summary,
+            "content":      None,
             "source_url":   url,
             "source_name":  feed["name"],
             "category":     feed["cat"],
             "image_url":    image_url,
-            "author":       extra.get("author"),
+            "author":       entry.get("author", None),
             "published_at": parse_date(entry),
         }
 
         if insert_article(article):
             existing.add(url)
             inserted += 1
-            print(f"  ✓ {title[:60]}...")
+            print(f"  ✓ {title[:70]}...")
+        else:
+            print(f"  ✗ Insert thất bại: {title[:40]}")
 
     return inserted
 
@@ -141,7 +134,9 @@ def main():
     for feed in FEEDS:
         total += scrape_feed(feed, existing)
 
-    print(f"\n✅ Hoàn thành — đã thêm {total} bài mới")
+    print(f"\n{'='*60}")
+    print(f"✅ Hoàn thành — đã thêm {total} bài mới")
+    print(f"{'='*60}")
 
 if __name__ == "__main__":
     main()
