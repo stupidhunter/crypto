@@ -476,6 +476,18 @@
   }
   .footer-bottom span { color:var(--green); }
 
+  /* NEWS TABS */
+  .news-tab {
+    padding:.5rem 1.25rem; border-radius:20px; font-size:.85rem;
+    font-family:inherit; font-weight:600; cursor:pointer;
+    border:1px solid var(--border); background:transparent;
+    color:var(--muted); transition:all .2s;
+  }
+  .news-tab:hover { border-color:var(--cyan); color:var(--cyan); background:rgba(0,200,255,0.06); }
+  .news-tab.active { background:rgba(0,232,122,0.1); border-color:var(--green); color:var(--green); }
+  .news-tab.active-vn { background:rgba(245,197,24,0.1); border-color:var(--gold); color:var(--gold); }
+  .news-tab.active-intl { background:rgba(0,200,255,0.1); border-color:var(--cyan); color:var(--cyan); }
+
   /* ANIMATIONS */
   @keyframes fadeInUp {
     from { opacity:0; transform:translateY(30px); }
@@ -744,6 +756,23 @@
   <div class="section-tag">TIN TỨC</div>
   <h2 class="section-title">Bản Tin <span>Crypto</span> Hôm Nay</h2>
   <p class="section-desc">Cập nhật liên tục từ thị trường toàn cầu và Việt Nam.</p>
+
+  <!-- TABS -->
+  <div style="display:flex;gap:.75rem;margin:2rem 0 1.5rem;flex-wrap:wrap;">
+    <button class="news-tab active" onclick="switchTab('all')" id="tab-all">
+      🌐 Tất Cả
+    </button>
+    <button class="news-tab" onclick="switchTab('vn')" id="tab-vn">
+      🇻🇳 Việt Nam
+    </button>
+    <button class="news-tab" onclick="switchTab('intl')" id="tab-intl">
+      🌍 Quốc Tế
+    </button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--muted);">
+      <span>Cập nhật: <span id="news-update-time" style="color:var(--green);font-family:'JetBrains Mono',monospace;"></span></span>
+    </div>
+  </div>
+
   <div class="news-grid" id="news-grid">
     <div style="color:var(--muted);padding:2rem;grid-column:1/-1;text-align:center;">Đang tải tin tức...</div>
   </div>
@@ -1033,39 +1062,86 @@ const SUPA_URL = 'https://zrlduuchvzatkbebhlsx.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybGR1dWNodnphdGtiZWJobHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjA5NzcsImV4cCI6MjA5MTMzNjk3N30.xUQWrL4r9pkScwyg1QdWZf0abkOJaIK2LzNC7OPpcL8';
 // =====================================================
 
+const VN_SOURCES  = ['TiềnÁo.com', 'CoinViet', 'VietnamFinance', 'CafeF'];
+const VN_CATS     = ['Việt Nam'];
+
+let allArticles = [];
+let currentTab  = 'all';
+
+function isVN(a) {
+  return VN_CATS.includes(a.category) || VN_SOURCES.includes(a.source_name);
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  // Update tab styles
+  document.querySelectorAll('.news-tab').forEach(b => {
+    b.classList.remove('active','active-vn','active-intl');
+  });
+  const el = document.getElementById('tab-'+tab);
+  if(tab==='all')  el.classList.add('active');
+  if(tab==='vn')   el.classList.add('active-vn');
+  if(tab==='intl') el.classList.add('active-intl');
+  renderNews();
+}
+
+function renderNews() {
+  const container = document.getElementById('news-grid');
+  let filtered = allArticles;
+  if(currentTab === 'vn')   filtered = allArticles.filter(a => isVN(a));
+  if(currentTab === 'intl') filtered = allArticles.filter(a => !isVN(a));
+
+  if(!filtered.length) {
+    const msg = currentTab==='vn'
+      ? 'Chưa có tin tức Việt Nam. Bot sẽ cập nhật sớm!'
+      : 'Chưa có tin tức quốc tế.';
+    container.innerHTML = `<div style="color:var(--muted);padding:3rem;grid-column:1/-1;text-align:center;">${msg}</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.slice(0,6).map(a => `
+    <div class="news-card" onclick="window.open('${escHtml(a.source_url)}','_blank')" style="cursor:pointer;">
+      <div class="news-img" style="background:${catColor(a.category)};">
+        <span style="font-size:2.5rem;">${catEmoji(a.category)}</span>
+        <div class="news-img-text" style="color:rgba(255,255,255,0.6);">${escHtml(a.source_name||'')} · ${escHtml(a.category||'')}</div>
+      </div>
+      <div class="news-body">
+        <span class="news-tag" style="color:${catAccent(a.category)};">${escHtml(a.category||'Tin tức')}</span>
+        <h4>${escHtml(a.title||'')}</h4>
+        <p>${escHtml((a.summary||'').substring(0,140))}${(a.summary||'').length>140?'...':''}</p>
+        <div class="news-meta">
+          <span>${escHtml(a.source_name||'Nguồn ẩn')}</span>
+          <span>${timeAgo(a.published_at)}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.news-card').forEach((el,i) => {
+    el.style.opacity='0';
+    el.style.animation=`fadeInUp .5s ease ${i*0.08}s forwards`;
+  });
+
+  const t = document.getElementById('news-update-time');
+  if(t) t.textContent = new Date().toLocaleTimeString('vi-VN');
+}
+
 async function fetchNews() {
   const container = document.getElementById('news-grid');
   try {
     const res = await fetch(
-      `${SUPA_URL}/rest/v1/articles?select=*&order=published_at.desc&limit=6`,
+      `${SUPA_URL}/rest/v1/articles?select=*&order=published_at.desc&limit=100`,
       { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
     );
-    const articles = await res.json();
-    if (!Array.isArray(articles) || !articles.length) {
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if(!Array.isArray(data)) throw new Error('Invalid response');
+    allArticles = data;
+    if(!allArticles.length) {
       container.innerHTML = '<div style="color:var(--muted);padding:2rem;grid-column:1/-1;text-align:center;">Chưa có bài viết. Bot sẽ chạy lúc 7:00 AM sáng mai.</div>';
       return;
     }
-    container.innerHTML = articles.map(a => `
-      <div class="news-card" onclick="window.open('${escHtml(a.source_url)}','_blank')" style="cursor:pointer;">
-        <div class="news-img" style="background:${catColor(a.category)};">
-          <span style="font-size:2.5rem;">${catEmoji(a.category)}</span>
-          <div class="news-img-text" style="color:rgba(255,255,255,0.6);">${escHtml(a.source_name||'')} · ${escHtml(a.category||'')}</div>
-        </div>
-        <div class="news-body">
-          <span class="news-tag" style="color:${catAccent(a.category)};">${escHtml(a.category||'Tin tức')}</span>
-          <h4>${escHtml(a.title||'')}</h4>
-          <p>${escHtml((a.summary||'').substring(0,140))}${(a.summary||'').length>140?'...':''}</p>
-          <div class="news-meta">
-            <span>${escHtml(a.source_name||'Nguồn ẩn')}</span>
-            <span>${timeAgo(a.published_at)}</span>
-          </div>
-        </div>
-      </div>
-    `).join('');
-    container.querySelectorAll('.news-card').forEach((el,i) => {
-      el.style.opacity='0';
-      el.style.animation=`fadeInUp .5s ease ${i*0.1}s forwards`;
-    });
+    renderNews();
   } catch(err) {
     container.innerHTML = `<div style="color:var(--red);padding:2rem;grid-column:1/-1;text-align:center;">Lỗi tải tin: ${err.message}</div>`;
   }
