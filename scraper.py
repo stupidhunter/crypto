@@ -14,22 +14,44 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-FEEDS = [
-    {"url": "https://feeds.feedburner.com/CoinDesk",           "name": "CoinDesk",      "cat": "Tin tức"},
-    {"url": "https://cointelegraph.com/rss/tag/bitcoin",       "name": "CoinTelegraph", "cat": "Bitcoin"},
-    {"url": "https://cointelegraph.com/rss/tag/ethereum",      "name": "CoinTelegraph", "cat": "DeFi"},
-    {"url": "https://cointelegraph.com/rss/tag/altcoin",       "name": "CoinTelegraph", "cat": "Altcoin"},
-    {"url": "https://decrypt.co/feed",                         "name": "Decrypt",       "cat": "Tin tức"},
-    {"url": "https://cryptoslate.com/feed/",                   "name": "CryptoSlate",   "cat": "Tin tức"},
-    {"url": "https://cryptopotato.com/feed/",                  "name": "CryptoPotato",  "cat": "Altcoin"},
-    {"url": "https://ambcrypto.com/feed/",                     "name": "AMBCrypto",     "cat": "Tin tức"},
-    {"url": "https://bitcoinist.com/feed/",                    "name": "Bitcoinist",    "cat": "Bitcoin"},
-    {"url": "https://newsbtc.com/feed/",                       "name": "NewsBTC",       "cat": "Tin tức"},
+# ── NGUỒN QUỐC TẾ ────────────────────────────────────────────────────
+FEEDS_INTL = [
+    {"url": "https://feeds.feedburner.com/CoinDesk",             "name": "CoinDesk",      "cat": "Tin tức"},
+    {"url": "https://cointelegraph.com/rss/tag/bitcoin",         "name": "CoinTelegraph", "cat": "Bitcoin"},
+    {"url": "https://cointelegraph.com/rss/tag/ethereum",        "name": "CoinTelegraph", "cat": "DeFi"},
+    {"url": "https://cointelegraph.com/rss/tag/altcoin",         "name": "CoinTelegraph", "cat": "Altcoin"},
+    {"url": "https://decrypt.co/feed",                           "name": "Decrypt",       "cat": "Tin tức"},
+    {"url": "https://cryptoslate.com/feed/",                     "name": "CryptoSlate",   "cat": "Tin tức"},
+    {"url": "https://cryptopotato.com/feed/",                    "name": "CryptoPotato",  "cat": "Altcoin"},
+    {"url": "https://ambcrypto.com/feed/",                       "name": "AMBCrypto",     "cat": "Tin tức"},
+    {"url": "https://bitcoinist.com/feed/",                      "name": "Bitcoinist",    "cat": "Bitcoin"},
+    {"url": "https://newsbtc.com/feed/",                         "name": "NewsBTC",       "cat": "Tin tức"},
 ]
 
+# ── NGUỒN VIỆT NAM ────────────────────────────────────────────────────
+# Các nguồn crypto/blockchain uy tín tại VN, có RSS hoạt động
+FEEDS_VN = [
+    # Blog Tiền Ảo — cộng đồng crypto lớn nhất VN (169K Facebook)
+    {"url": "https://blogtienao.com/feed/",                      "name": "BlogTiềnẢo",    "cat": "Việt Nam"},
+    # BitcoinVN News — sàn Bitcoin lâu đời nhất VN
+    {"url": "https://bitcoinvn.io/news/feed/",                   "name": "BitcoinVN",     "cat": "Việt Nam"},
+    # Tiền Ảo — tin tức crypto tiếng Việt
+    {"url": "https://tienao.com/feed/",                          "name": "TiềnÁo.com",   "cat": "Việt Nam"},
+    # CoinViet
+    {"url": "https://coinviet.net/feed/",                        "name": "CoinViet",      "cat": "Việt Nam"},
+    # Vietnam Blockchain — tin tức blockchain VN
+    {"url": "https://vietnamblockchain.asia/feed/",              "name": "VN Blockchain", "cat": "Việt Nam"},
+    # Coin68 — tin crypto tiếng Việt phổ biến
+    {"url": "https://coin68.com/feed/",                          "name": "Coin68",        "cat": "Việt Nam"},
+    # CafeF công nghệ — mảng fintech/crypto
+    {"url": "https://cafef.vn/tai-chinh-ngan-hang.rss",          "name": "CafeF",         "cat": "Việt Nam"},
+    # news.bitcoin.com tag vietnam
+    {"url": "https://news.bitcoin.com/tag/vietnam/feed/",        "name": "Bitcoin News VN","cat": "Việt Nam"},
+]
+
+FEEDS = FEEDS_INTL + FEEDS_VN
 MAX_PER_FEED = 5
 
-# User-agent để tránh bị block
 feedparser.USER_AGENT = "Mozilla/5.0 (compatible; CongDongCryptoBot/1.0)"
 
 def get_existing_urls() -> set:
@@ -66,7 +88,7 @@ def scrape_feed(feed: dict, existing: set) -> int:
     print(f"\n→ {feed['name']} ({feed['url']})")
     try:
         parsed = feedparser.parse(feed["url"])
-        status = parsed.get("status", "N/A")
+        status  = parsed.get("status", "N/A")
         entries = len(parsed.entries)
         print(f"  HTTP status: {status} | Entries: {entries}")
         if parsed.bozo:
@@ -130,12 +152,18 @@ def main():
     existing = get_existing_urls()
     print(f"Đã có {len(existing)} bài trong DB")
 
-    total = 0
-    for feed in FEEDS:
-        total += scrape_feed(feed, existing)
+    total_intl = 0
+    print("\n📡 NGUỒN QUỐC TẾ")
+    for feed in FEEDS_INTL:
+        total_intl += scrape_feed(feed, existing)
+
+    total_vn = 0
+    print("\n🇻🇳 NGUỒN VIỆT NAM")
+    for feed in FEEDS_VN:
+        total_vn += scrape_feed(feed, existing)
 
     print(f"\n{'='*60}")
-    print(f"✅ Hoàn thành — đã thêm {total} bài mới")
+    print(f"✅ Hoàn thành — Quốc tế: {total_intl} bài | Việt Nam: {total_vn} bài")
     print(f"{'='*60}")
 
 if __name__ == "__main__":
