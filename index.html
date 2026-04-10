@@ -918,9 +918,11 @@ const COIN_META = {
 // Lưu giá + change hiện tại
 const prices = {};
 const changes = {};
+const klines = {}; // lưu data 24h thật
 Object.keys(COIN_META).forEach(sym => {
   prices[sym]  = 0;
   changes[sym] = 0;
+  klines[sym]  = [];
 });
 
 function fmtPrice(p) {
@@ -930,10 +932,51 @@ function fmtPrice(p) {
   return '$'+p.toFixed(5);
 }
 
-function sparklineHTML(dir) {
-  const heights = Array.from({length:10}, () => Math.floor(Math.random()*18)+8);
+// Fetch kline 24h từ Binance REST (24 nến 1h)
+async function fetchKlines(sym) {
+  try {
+    const res = await fetch(
+      `https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=1h&limit=24`
+    );
+    const data = await res.json();
+    if(Array.isArray(data)) {
+      // close price của mỗi nến
+      klines[sym] = data.map(k => parseFloat(k[4]));
+    }
+  } catch(e) { /* giữ nguyên nếu lỗi */ }
+}
+
+// Fetch tất cả klines song song
+async function fetchAllKlines() {
+  await Promise.all(Object.keys(COIN_META).map(sym => fetchKlines(sym)));
+  renderTable();
+}
+
+function sparklineHTML(sym, dir) {
+  const data = klines[sym];
+  if(!data || data.length < 2) {
+    // Fallback random nếu chưa có data
+    const color = dir==='up' ? 'var(--green)' : 'var(--red)';
+    const bars = Array.from({length:24}, () => Math.floor(Math.random()*18)+4);
+    return svgSparkline(bars, color);
+  }
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const heights = data.map(v => Math.round(4 + ((v - min) / range) * 20));
   const color = dir==='up' ? 'var(--green)' : 'var(--red)';
-  return '<div class="sparkline">'+heights.map(h=>`<span style="height:${h}px;background:${color};opacity:.7;"></span>`).join('')+'</div>';
+  return svgSparkline(heights, color);
+}
+
+function svgSparkline(heights, color) {
+  const w = 80, h = 28, n = heights.length;
+  const barW = Math.floor((w - (n-1)) / n);
+  const bars = heights.map((bh, i) => {
+    const x = i * (barW + 1);
+    const y = h - bh;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="1" fill="${color}" opacity="0.75"/>`;
+  }).join('');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;">${bars}</svg>`;
 }
 
 function renderTable() {
@@ -951,7 +994,7 @@ function renderTable() {
       <td class="price-val">${fmtPrice(p)}</td>
       <td class="${dir}" style="font-weight:600;">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
       <td style="color:var(--muted);">${m.mcap}</td>
-      <td>${sparklineHTML(dir)}</td>
+      <td>${sparklineHTML(sym, dir)}</td>
       <td><button class="buy-btn ${chg>=0?'b':'s'}">${chg>=0?'Mua':'Bán'}</button></td>
     </tr>`;
   }).join('');
@@ -1014,8 +1057,11 @@ function refreshPrices() {
 }
 
 // Khởi động
-renderTable(); // render placeholder trước
-connectWS();   // kết nối WS lấy giá thật
+renderTable();       // render placeholder trước
+connectWS();         // kết nối WS lấy giá real-time
+fetchAllKlines();    // lấy kline 24h thật từ Binance REST
+// Refresh kline mỗi 30 phút
+setInterval(fetchAllKlines, 30 * 60 * 1000);
 
 // FAQ TOGGLE
 function toggleFaq(el) {
