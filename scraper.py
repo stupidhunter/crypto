@@ -135,11 +135,9 @@ def strip_html(text: str) -> str:
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
-def escape_md(text: str) -> str:
-    """Escape ký tự đặc biệt Markdown cho Telegram"""
-    for ch in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
-        text = text.replace(ch, '\\' + ch)
-    return text
+def escape_html(text: str) -> str:
+    """Escape ký tự đặc biệt HTML cho Telegram"""
+    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 def send_telegram(articles: list):
     """Gửi điểm tin lên Telegram channel"""
@@ -165,32 +163,38 @@ def send_telegram(articles: list):
         "Tin tức":  "📰",
     }
 
-    lines = [f"🚀 *ĐIỂM TIN CRYPTO* — {now}", "━━━━━━━━━━━━━━━━━━━━━━", ""]
+    lines = [
+        f"🚀 <b>ĐIỂM TIN CRYPTO</b> — {now}",
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+    ]
 
     for a in top:
         emoji   = cat_emoji.get(a.get("category"), "🌐")
-        title   = strip_html(a.get("title", ""))[:90]
+        title   = escape_html(strip_html(a.get("title", "")))[:90]
         summary = strip_html(a.get("summary", ""))
-        # Lấy 1 câu đầu tiên của summary
+
+        # Lấy 1 câu đầu tiên
         first_sentence = summary.split('.')[0].strip()
         if len(first_sentence) > 10:
-            summary_short = first_sentence[:100] + "..."
+            summary_short = escape_html(first_sentence[:100]) + "..."
         else:
-            summary_short = summary[:100] + "..." if len(summary) > 100 else summary
+            raw = summary[:100] + "..." if len(summary) > 100 else summary
+            summary_short = escape_html(raw)
 
-        lines.append(f"{emoji} *{title}*")
-        if summary_short and summary_short != "...":
-            lines.append(f"_{summary_short}_")
-        # Link về website của mình thay vì link gốc
         art_id = a.get("id", "")
-        if art_id:
-            lines.append(f"🔗 [Đọc tiếp]({SITE_URL}/article?id={art_id})")
-        else:
-            lines.append(f"🔗 [Đọc tiếp]({a['source_url']})")
+        link   = f"{SITE_URL}/article?id={art_id}" if art_id else a.get("source_url", "#")
+
+        lines.append(f"{emoji} <b>{title}</b>")
+        if summary_short and summary_short not in ("...", ""):
+            lines.append(f"<i>{summary_short}</i>")
+        lines.append(f'🔗 <a href="{link}">Đọc tiếp</a>')
         lines.append("")
 
-    lines += ["━━━━━━━━━━━━━━━━━━━━━━",
-              f"📊 [Xem thêm tại CộngĐồngCrypto]({SITE_URL})"]
+    lines += [
+        "━━━━━━━━━━━━━━━━━━━━━━",
+        f'📊 <a href="{SITE_URL}">Xem thêm tại CộngĐồngCrypto</a>',
+    ]
 
     text = "\n".join(lines)
 
@@ -199,7 +203,7 @@ def send_telegram(articles: list):
         json={
             "chat_id":                  TELEGRAM_CHAT_ID,
             "text":                     text,
-            "parse_mode":               "Markdown",
+            "parse_mode":               "HTML",
             "disable_web_page_preview": True,
         },
         timeout=10,
