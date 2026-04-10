@@ -476,6 +476,19 @@
   }
   .footer-bottom span { color:var(--green); }
 
+  /* AI COIN BUTTONS */
+  .ai-coin-btn {
+    padding:.4rem 1rem; border-radius:20px; font-size:.82rem;
+    font-family:inherit; font-weight:600; cursor:pointer;
+    border:1px solid var(--border); background:transparent;
+    color:var(--muted); transition:all .2s;
+  }
+  .ai-coin-btn:hover { border-color:var(--cyan); color:var(--cyan); }
+  .ai-coin-btn.active { background:rgba(0,200,255,0.1); border-color:var(--cyan); color:var(--cyan); }
+  @media(max-width:900px) {
+    #ai-analysis > div:last-of-type { grid-template-columns:1fr !important; }
+  }
+
   /* NEWS TABS */
   .news-tab {
     padding:.5rem 1.25rem; border-radius:20px; font-size:.85rem;
@@ -629,6 +642,61 @@
       </thead>
       <tbody id="market-body"></tbody>
     </table>
+  </div>
+</section>
+
+<!-- AI PHÂN TÍCH -->
+<section id="ai-analysis" style="background:var(--bg0);">
+  <div class="section-tag">AI PHÂN TÍCH</div>
+  <h2 class="section-title">Phân Tích <span>Thị Trường</span> Bằng AI</h2>
+  <p class="section-desc">Chọn coin để xem chart kỹ thuật thật và phân tích AI bằng tiếng Việt — powered by TradingView + Groq.</p>
+
+  <!-- COIN SELECTOR -->
+  <div style="display:flex;gap:.75rem;margin:2rem 0 1.5rem;flex-wrap:wrap;align-items:center;">
+    <div id="ai-coin-btns" style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <button class="ai-coin-btn active" onclick="selectCoin('BTCUSDT','Bitcoin')" id="ai-btn-BTC">₿ BTC</button>
+      <button class="ai-coin-btn" onclick="selectCoin('ETHUSDT','Ethereum')" id="ai-btn-ETH">Ξ ETH</button>
+      <button class="ai-coin-btn" onclick="selectCoin('SOLUSDT','Solana')" id="ai-btn-SOL">◎ SOL</button>
+      <button class="ai-coin-btn" onclick="selectCoin('BNBUSDT','BNB')" id="ai-btn-BNB">B BNB</button>
+      <button class="ai-coin-btn" onclick="selectCoin('XRPUSDT','XRP')" id="ai-btn-XRP">✕ XRP</button>
+      <button class="ai-coin-btn" onclick="selectCoin('ADAUSDT','Cardano')" id="ai-btn-ADA">₳ ADA</button>
+      <button class="ai-coin-btn" onclick="selectCoin('DOGEUSDT','Dogecoin')" id="ai-btn-DOGE">Ð DOGE</button>
+    </div>
+    <button onclick="runAIAnalysis()" id="ai-run-btn" style="margin-left:auto;padding:.5rem 1.4rem;background:linear-gradient(135deg,var(--green),var(--cyan));color:#060810;border:none;border-radius:8px;font-weight:700;font-family:inherit;font-size:.88rem;cursor:pointer;transition:all .2s;">
+      🤖 Phân Tích AI
+    </button>
+  </div>
+
+  <!-- MAIN LAYOUT: chart + AI -->
+  <div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start;">
+
+    <!-- TRADINGVIEW CHART -->
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+      <div id="tv-container" style="height:460px;"></div>
+    </div>
+
+    <!-- AI ANALYSIS PANEL -->
+    <div style="display:flex;flex-direction:column;gap:1rem;">
+
+      <!-- Technical Summary từ TradingView -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+        <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);font-size:.8rem;font-weight:700;letter-spacing:.1em;color:var(--muted);">TECHNICAL ANALYSIS</div>
+        <div id="tv-technical" style="height:180px;"></div>
+      </div>
+
+      <!-- Groq AI Analysis -->
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.25rem;">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;">
+          <div style="width:28px;height:28px;background:linear-gradient(135deg,var(--green),var(--cyan));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.85rem;">🤖</div>
+          <span style="font-size:.8rem;font-weight:700;letter-spacing:.1em;color:var(--muted);">GROQ AI · TIẾNG VIỆT</span>
+          <span id="ai-model-badge" style="margin-left:auto;font-size:.65rem;background:rgba(0,232,122,0.1);color:var(--green);padding:.2rem .6rem;border-radius:10px;border:1px solid rgba(0,232,122,0.2);">llama-3.3-70b</span>
+        </div>
+        <div id="ai-result" style="font-size:.875rem;line-height:1.75;color:var(--muted);min-height:180px;">
+          <span style="color:var(--border2);">← Chọn coin và bấm "Phân Tích AI" để xem nhận định thị trường bằng tiếng Việt</span>
+        </div>
+      </div>
+
+    </div>
   </div>
 </section>
 
@@ -1102,13 +1170,11 @@ document.querySelectorAll('.feat-card, .stat-card').forEach(el => {
 
 <script>
 // =====================================================
-// SUPABASE CONFIG — chỉ cần thay 2 dòng dưới đây
-// =====================================================
-const SUPA_URL = 'https://zrlduuchvzatkbebhlsx.supabase.co';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybGR1dWNodnphdGtiZWJobHN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NjA5NzcsImV4cCI6MjA5MTMzNjk3N30.xUQWrL4r9pkScwyg1QdWZf0abkOJaIK2LzNC7OPpcL8';
+// Không còn key nào ở đây — dùng Vercel API proxy
 // =====================================================
 
-const VN_SOURCES  = ['TiềnÁo.com', 'CoinViet', 'VietnamFinance', 'CafeF'];
+const VN_SOURCES  = ['TiềnÁo.com', 'CoinViet', 'VietnamFinance', 'CafeF',
+                     'BlogTiềnẢo', 'BitcoinVN', 'VN Blockchain', 'Coin68', 'Bitcoin News VN'];
 const VN_CATS     = ['Việt Nam'];
 
 let allArticles = [];
@@ -1175,10 +1241,7 @@ function renderNews() {
 async function fetchNews() {
   const container = document.getElementById('news-grid');
   try {
-    const res = await fetch(
-      `${SUPA_URL}/rest/v1/articles?select=*&order=published_at.desc&limit=100`,
-      { headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` } }
-    );
+    const res = await fetch('/api/news?limit=100');
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if(!Array.isArray(data)) throw new Error('Invalid response');
@@ -1216,6 +1279,122 @@ function escHtml(s=''){
 
 fetchNews();
 setInterval(fetchNews, 5*60*1000);
+</script>
+<!-- TRADINGVIEW + GROQ AI -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+let currentSymbol = 'BTCUSDT';
+let currentName   = 'Bitcoin';
+let tvWidget      = null;
+let tvTechnical   = null;
+
+function selectCoin(symbol, name) {
+  currentSymbol = symbol;
+  currentName   = name;
+  document.querySelectorAll('.ai-coin-btn').forEach(b => b.classList.remove('active'));
+  const sym3 = symbol.replace('USDT','');
+  const btn  = document.getElementById('ai-btn-'+sym3);
+  if(btn) btn.classList.add('active');
+  loadTradingView(symbol);
+}
+
+function loadTradingView(symbol) {
+  // Main chart
+  document.getElementById('tv-container').innerHTML = '';
+  tvWidget = new TradingView.widget({
+    container_id: 'tv-container',
+    symbol: 'BINANCE:' + symbol,
+    interval: '1H',
+    timezone: 'Asia/Ho_Chi_Minh',
+    theme: 'dark',
+    style: '1',
+    locale: 'vi_VN',
+    toolbar_bg: '#111526',
+    enable_publishing: false,
+    hide_top_toolbar: false,
+    hide_legend: false,
+    save_image: false,
+    height: 460,
+    width: '100%',
+    studies: ['RSI@tv-basicstudies', 'MACD@tv-basicstudies'],
+    hide_volume: false,
+  });
+
+  // Technical analysis widget
+  document.getElementById('tv-technical').innerHTML = '';
+  tvTechnical = new TradingView.widget({
+    container_id: 'tv-technical',
+    symbol: 'BINANCE:' + symbol,
+    interval: '1H',
+    width: '100%',
+    height: 180,
+    locale: 'vi_VN',
+    colorTheme: 'dark',
+    isTransparent: true,
+    displayMode: 'single',
+    widgetType: 'technical-analysis',
+  });
+}
+
+// Groq API key — lưu localStorage
+// Load TradingView khi vào trang
+window.addEventListener('load', () => {
+  loadTradingView(currentSymbol);
+});
+
+async function runAIAnalysis() {
+  const btn = document.getElementById('ai-run-btn');
+  btn.textContent = '⏳ Đang phân tích...';
+  btn.disabled = true;
+
+  const sym      = currentSymbol.replace('USDT','');
+  const price    = prices[sym] || 0;
+  const chg      = changes[sym] || 0;
+  const klineData = klines[sym] || [];
+
+  let klineSummary = '';
+  if(klineData.length >= 2) {
+    const open  = klineData[0];
+    const close = klineData[klineData.length - 1];
+    const high  = Math.max(...klineData);
+    const low   = Math.min(...klineData);
+    klineSummary = `Giá 24h: mở ${open.toFixed(2)}, cao ${high.toFixed(2)}, thấp ${low.toFixed(2)}, đóng ${close.toFixed(2)}.`;
+  }
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        symbol:       sym,
+        name:         currentName,
+        price:        price,
+        change:       chg,
+        klineSummary: klineSummary,
+      }),
+    });
+
+    if(!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.result || 'Không có kết quả';
+
+    document.getElementById('ai-result').innerHTML =
+      `<div style="color:var(--text);">${text.replace(/\n/g,'<br>')}</div>
+       <div style="margin-top:.75rem;font-size:.72rem;color:var(--muted);border-top:1px solid var(--border);padding-top:.5rem;">
+         ⚡ Groq · llama-3.3-70b · ${new Date().toLocaleTimeString('vi-VN')}
+       </div>`;
+  } catch(err) {
+    document.getElementById('ai-result').innerHTML =
+      `<span style="color:var(--red);">Lỗi: ${err.message}</span>`;
+  } finally {
+    btn.textContent = '🤖 Phân Tích AI';
+    btn.disabled = false;
+  }
+}
 </script>
 </body>
 </html>
