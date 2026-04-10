@@ -2,7 +2,14 @@ name: 🤖 Daily News Bot
 
 on:
   schedule:
+    # 7:00 AM Vietnam (UTC+7 = UTC+0 trừ 7h)
     - cron: "0 0 * * *"
+    # 12:00 PM Vietnam
+    - cron: "0 5 * * *"
+    # 6:00 PM Vietnam
+    - cron: "0 11 * * *"
+    # 11:00 PM Vietnam
+    - cron: "0 16 * * *"
   workflow_dispatch:
 
 jobs:
@@ -29,6 +36,8 @@ jobs:
 
       - name: Run scraper
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python scraper.py
