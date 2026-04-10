@@ -2,7 +2,7 @@
 CongDongCrypto News Bot
 Chạy 4 lần/ngày qua GitHub Actions — scrape RSS + gửi Telegram
 """
-import os, feedparser, requests
+import os, feedparser, requests, re
 from datetime import datetime, timezone
 
 SUPABASE_URL        = os.environ["SUPABASE_URL"]
@@ -15,6 +15,8 @@ HEADERS = {
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type":  "application/json",
 }
+
+SITE_URL = "https://cryptocommunity-rose.vercel.app"
 
 FEEDS_INTL = [
     {"url": "https://feeds.feedburner.com/CoinDesk",           "name": "CoinDesk",      "cat": "Tin tức"},
@@ -125,6 +127,20 @@ def scrape_feed(feed: dict, existing: set) -> list:
 
     return new_articles
 
+def strip_html(text: str) -> str:
+    """Xóa toàn bộ HTML tags và decode entities"""
+    text = re.sub(r'<[^>]+>', '', text)
+    text = text.replace('&amp;', '&').replace('&lt;', '<').replace('&gt;', '>') \
+               .replace('&quot;', '"').replace('&#39;', "'").replace('&nbsp;', ' ')
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+def escape_md(text: str) -> str:
+    """Escape ký tự đặc biệt Markdown cho Telegram"""
+    for ch in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
+        text = text.replace(ch, '\\' + ch)
+    return text
+
 def send_telegram(articles: list):
     """Gửi điểm tin lên Telegram channel"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -135,31 +151,48 @@ def send_telegram(articles: list):
         return
 
     now  = datetime.now().strftime("%d/%m/%Y %H:%M")
-    text = f"🚀 *ĐIỂM TIN CRYPTO* — {now}\n"
-    text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
-    # Gửi tối đa 6 bài, ưu tiên Việt Nam lên đầu
+    # Ưu tiên VN lên đầu, tối đa 6 bài
     vn   = [a for a in articles if a.get("category") == "Việt Nam"]
     intl = [a for a in articles if a.get("category") != "Việt Nam"]
     top  = (vn + intl)[:6]
 
     cat_emoji = {
         "Bitcoin":  "₿",
-        "DeFi":     "⬡",
-        "Altcoin":  "◎",
+        "DeFi":     "🔷",
+        "Altcoin":  "🪙",
         "Việt Nam": "🇻🇳",
         "Tin tức":  "📰",
     }
 
-    for i, a in enumerate(top, 1):
-        emoji = cat_emoji.get(a.get("category"), "🌐")
-        text += f"{emoji} *{a['title'][:80]}*\n"
-        if a.get("summary"):
-            text += f"_{a['summary'][:120]}..._\n"
-        text += f"🔗 [Đọc tiếp]({a['source_url']}) — {a['source_name']}\n\n"
+    lines = [f"🚀 *ĐIỂM TIN CRYPTO* — {now}", "━━━━━━━━━━━━━━━━━━━━━━", ""]
 
-    text += "━━━━━━━━━━━━━━━━━━━━━━\n"
-    text += "📊 [Xem thêm tại CộngĐồngCrypto](https://cryptocommunity-rose.vercel.app)"
+    for a in top:
+        emoji   = cat_emoji.get(a.get("category"), "🌐")
+        title   = strip_html(a.get("title", ""))[:90]
+        summary = strip_html(a.get("summary", ""))
+        # Lấy 1 câu đầu tiên của summary
+        first_sentence = summary.split('.')[0].strip()
+        if len(first_sentence) > 10:
+            summary_short = first_sentence[:100] + "..."
+        else:
+            summary_short = summary[:100] + "..." if len(summary) > 100 else summary
+
+        lines.append(f"{emoji} *{title}*")
+        if summary_short and summary_short != "...":
+            lines.append(f"_{summary_short}_")
+        # Link về website của mình thay vì link gốc
+        art_id = a.get("id", "")
+        if art_id:
+            lines.append(f"🔗 [Đọc tiếp]({SITE_URL}/article?id={art_id})")
+        else:
+            lines.append(f"🔗 [Đọc tiếp]({a['source_url']})")
+        lines.append("")
+
+    lines += ["━━━━━━━━━━━━━━━━━━━━━━",
+              f"📊 [Xem thêm tại CộngĐồngCrypto]({SITE_URL})"]
+
+    text = "\n".join(lines)
 
     res = requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
@@ -167,7 +200,7 @@ def send_telegram(articles: list):
             "chat_id":                  TELEGRAM_CHAT_ID,
             "text":                     text,
             "parse_mode":               "Markdown",
-            "disable_web_page_preview": False,
+            "disable_web_page_preview": True,
         },
         timeout=10,
     )
@@ -175,7 +208,7 @@ def send_telegram(articles: list):
     if res.ok:
         print(f"\n✅ Đã gửi Telegram — {len(top)} bài")
     else:
-        print(f"\n✗ Telegram lỗi: {res.status_code} {res.text[:100]}")
+        print(f"\n✗ Telegram lỗi: {res.status_code} {res.text[:200]}")
 
 def main():
     print("=" * 60)
