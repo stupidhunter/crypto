@@ -139,8 +139,8 @@ def send_telegram(articles: list):
     text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
     # Gửi tối đa 6 bài, ưu tiên Việt Nam lên đầu
-    vn   = [a for a in articles if a["cat"] == "Việt Nam"]
-    intl = [a for a in articles if a["cat"] != "Việt Nam"]
+    vn   = [a for a in articles if a.get("category") == "Việt Nam"]
+    intl = [a for a in articles if a.get("category") != "Việt Nam"]
     top  = (vn + intl)[:6]
 
     cat_emoji = {
@@ -152,7 +152,7 @@ def send_telegram(articles: list):
     }
 
     for i, a in enumerate(top, 1):
-        emoji = cat_emoji.get(a["cat"], "🌐")
+        emoji = cat_emoji.get(a.get("category"), "🌐")
         text += f"{emoji} *{a['title'][:80]}*\n"
         if a.get("summary"):
             text += f"_{a['summary'][:120]}..._\n"
